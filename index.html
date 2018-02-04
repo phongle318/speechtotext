@@ -1,0 +1,93 @@
+<html>
+    <head>
+        <!-- <script src="http://www.webrtc-experiment.com/RecordRTC.js"></script> -->
+        <!-- <script src="https://cdn.webrtc-experiment.com/MediaStreamRecorder.js"> </script> -->
+        <script src="./record.js"> </script>
+    </head>
+    <body>
+            <button onclick="startRecording()">START</button>
+            <br>
+            <br>
+            <button onclick="stopRecording()">STOP</button>
+            <br>
+            <p id="demo"></p>
+    </body>
+  <script>
+    window.URL = window.URL || window.webkitURL;
+    navigator.getUserMedia  = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+
+    var recorder;
+    var audio = document.querySelector('audio');
+    var websocket ;
+    var text;
+    // var recorder;
+    var onSuccess = function(s) {
+        // var mediaRecorder = new MediaStreamRecorder(s);
+        // recorder = mediaRecorder
+        // mediaRecorder.mimeType = 'audio/wav';
+        // mediaRecorder.ondataavailable = function (blob) {
+        //     // POST/PUT "Blob" using FormData/XHR2
+        //     var blobURL = URL.createObjectURL(blob);
+        //     websocket.send(s);
+        // };
+        var context = new AudioContext();
+        var mediaStreamSource = context.createMediaStreamSource(s);
+        console.log(mediaStreamSource)
+        mediaRecorder = new Recorder(mediaStreamSource);
+        recorder = mediaRecorder
+        console.log("recorder")
+        mediaRecorder.record();
+
+        // audio loopback
+        // mediaStreamSource.connect(context.destination);
+    }
+    var onFail= function(s) {
+        console.log(s)
+    }
+
+    function startRecording() {
+        var wsURI = "ws://asr.openfpt.vn/ws";
+
+        websocket = new WebSocket(wsURI);
+        websocket.onopen = function(evt) { onOpen(evt) };
+        websocket.onclose = function(evt) { onClose() };
+        websocket.onmessage = function(evt) { onMessage(evt) };
+        websocket.onerror = function(evt) { onError(evt) };
+        function onOpen(evt) {
+            var message = {
+            'action': 'start',
+            //'content-type': 'audio/l16;rate=22050' 
+            'content-type': 'audio/wav;rate=22050'
+            };
+            websocket.send(JSON.stringify(message));
+            console.log("OK")
+        }
+        function onMessage(evt) {
+            console.log(evt.data);
+            var obj = JSON.parse(evt.data)
+            if(obj.result.final != undefined){
+                document.getElementById("demo").innerHTML = obj.result.hypotheses[0].transcript
+            }
+            //console.log(JSON.parse(evt.data))
+        }
+        function onClose() {
+            websocket.close();
+        }
+        if (navigator.getUserMedia) {
+            navigator.getUserMedia({audio: true}, onSuccess, onFail);
+        } else {
+        console.log('navigator.getUserMedia not present');
+        }
+    }
+
+    function stopRecording() {
+        // mediaRecorder.stop();
+        recorder.stop();
+        recorder.exportWAV( function(s) {
+        //audio.src = window.URL.createObjectURL(s);
+            websocket.send(s);
+            //websocket.onclose();
+        });
+    }
+</script>
+</html>
